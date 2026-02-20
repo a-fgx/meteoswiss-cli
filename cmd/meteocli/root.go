@@ -35,6 +35,7 @@ and active weather warnings from the MeteoSwiss app backend.`,
 	rootCmd.AddCommand(newWeatherCmd(&flags))
 	rootCmd.AddCommand(newForecastCmd(&flags))
 	rootCmd.AddCommand(newWarningsCmd(&flags))
+	rootCmd.AddCommand(newRainCmd(&flags))
 
 	rootCmd.SetArgs(args)
 	if err := rootCmd.Execute(); err != nil {
