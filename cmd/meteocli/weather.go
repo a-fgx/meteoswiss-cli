@@ -53,7 +53,7 @@ func printCurrentWeather(plz int, detail *api.PLZDetail) {
 	out.Sep(44)
 	fmt.Printf("  Weather for PLZ %d\n", plz)
 	out.Sep(44)
-	fmt.Printf("  %s  %s\n", emoji, desc)
+	fmt.Printf("  %s (%s)\n", desc, emoji)
 	fmt.Printf("  Temperature : %.1f °C\n", cw.Temperature)
 	if cw.Time != "" {
 		fmt.Printf("  Observed at : %s\n", cw.Time)

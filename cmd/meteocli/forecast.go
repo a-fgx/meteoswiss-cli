@@ -65,7 +65,7 @@ func printForecast(plz int, forecast []api.DayForecast) {
 	for _, day := range forecast {
 		emoji := api.IconEmoji(day.IconDay)
 		desc := api.IconDescription(day.IconDay)
-		label := fmt.Sprintf("%s %s", emoji, desc)
+		label := fmt.Sprintf("%s (%s)", desc, emoji)
 		fmt.Printf("  %-12s %-22s %6.1f %6.1f  %8.1f\n",
 			day.DayDate,
 			truncate(label, 22),
