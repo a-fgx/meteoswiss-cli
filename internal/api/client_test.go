@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,19 +22,17 @@ func newTestClient(serverURL string) *Client {
 func TestPLZDetail_success(t *testing.T) {
 	want := PLZDetail{
 		CurrentWeather: CurrentWeather{
-			Time:        "2026-02-20T12:00:00",
+			Time:        1740052800, // 2026-02-20 12:00:00 UTC
 			Icon:        1,
 			Temperature: 5.5,
 		},
-		TenDaysForecast: []DayForecast{
+		Forecast: []DayForecast{
 			{
 				DayDate:        "2026-02-20",
 				IconDay:        2,
 				TemperatureMax: 8.0,
 				TemperatureMin: 2.0,
 				Precipitation:  0.5,
-				WindDirection:  270,
-				WindSpeed:      15,
 			},
 		},
 	}
@@ -64,27 +63,88 @@ func TestPLZDetail_success(t *testing.T) {
 	if got.CurrentWeather.Icon != want.CurrentWeather.Icon {
 		t.Errorf("Icon = %d, want %d", got.CurrentWeather.Icon, want.CurrentWeather.Icon)
 	}
-	if len(got.TenDaysForecast) != 1 {
-		t.Fatalf("TenDaysForecast len = %d, want 1", len(got.TenDaysForecast))
+	if len(got.Forecast) != 1 {
+		t.Fatalf("Forecast len = %d, want 1", len(got.Forecast))
 	}
-	if got.TenDaysForecast[0].DayDate != "2026-02-20" {
-		t.Errorf("DayDate = %q, want %q", got.TenDaysForecast[0].DayDate, "2026-02-20")
+	if got.Forecast[0].DayDate != "2026-02-20" {
+		t.Errorf("DayDate = %q, want %q", got.Forecast[0].DayDate, "2026-02-20")
 	}
 }
 
-func TestPLZDetail_nonOKStatus(t *testing.T) {
+// TestPLZDetail_integerTimestamps verifies that the client can decode a
+// realistic API response where time fields are Unix timestamps (integers),
+// not strings. This catches type mismatches between struct definitions and
+// the actual API wire format.
+func TestPLZDetail_integerTimestamps(t *testing.T) {
+	const body = `{
+		"currentWeather": {"time": 1740052800000, "icon": 3, "temperature": 7.2},
+		"forecast": [],
+		"graph": {
+			"start": 1740052800000,
+			"startLowResolution": 1740060000000,
+			"precipitation10m": [0.0, 0.2, 0.0],
+			"precipitation1h": [0.5, 1.2]
+		}
+	}`
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "not found", http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
 	}))
 	defer srv.Close()
 
 	client := newTestClient(srv.URL)
-	_, err := client.PLZDetail(8000)
-	if err == nil {
-		t.Fatal("expected error for 404, got nil")
+	got, err := client.PLZDetail(8000)
+	if err != nil {
+		t.Fatalf("PLZDetail() unexpected error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "404") {
-		t.Errorf("error %q should mention 404", err.Error())
+	if got.CurrentWeather.Time != 1740052800000 {
+		t.Errorf("CurrentWeather.Time = %d, want 1740052800000", got.CurrentWeather.Time)
+	}
+	if got.Graph == nil {
+		t.Fatal("Graph is nil, want non-nil")
+	}
+	if got.Graph.Start != 1740052800000 {
+		t.Errorf("Graph.Start = %d, want 1740052800000", got.Graph.Start)
+	}
+	if got.Graph.StartLowResolution != 1740060000000 {
+		t.Errorf("Graph.StartLowResolution = %d, want 1740060000000", got.Graph.StartLowResolution)
+	}
+	if len(got.Graph.Precipitation10m) != 3 {
+		t.Errorf("Precipitation10m len = %d, want 3", len(got.Graph.Precipitation10m))
+	}
+	if len(got.Graph.Precipitation1h) != 2 {
+		t.Errorf("Precipitation1h len = %d, want 2", len(got.Graph.Precipitation1h))
+	}
+}
+
+func TestPLZDetail_nonOKStatus(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+	}{
+		{"not found", http.StatusNotFound},
+		// 500 is what the MeteoSwiss API returns for unsupported PLZ codes
+		// (e.g. 8000 → 800000, a generic Zürich meta-code with no weather station).
+		{"server error", http.StatusInternalServerError},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, http.StatusText(tc.status), tc.status)
+			}))
+			defer srv.Close()
+
+			client := newTestClient(srv.URL)
+			_, err := client.PLZDetail(8000)
+			if err == nil {
+				t.Fatalf("expected error for %d, got nil", tc.status)
+			}
+			statusStr := fmt.Sprintf("%d", tc.status)
+			if !strings.Contains(err.Error(), statusStr) {
+				t.Errorf("error %q should mention %s", err.Error(), statusStr)
+			}
+		})
 	}
 }
 
@@ -111,63 +171,38 @@ func TestPLZDetail_serverDown(t *testing.T) {
 	}
 }
 
-// --- Warnings ---
+// TestPLZDetail_warnings verifies that warnings embedded in the plzDetail
+// response are decoded correctly. Warnings are PLZ-specific; there is no
+// standalone /warnings endpoint.
+func TestPLZDetail_warnings(t *testing.T) {
+	const body = `{
+		"currentWeather": {"time": 1740052800000, "icon": 1, "temperature": 5.0},
+		"forecast": [],
+		"warnings": [
+			{"warnType": 2, "warnLevel": 3, "headline": "Heavy rain expected"},
+			{"warnType": 0, "warnLevel": 2, "headline": "Strong winds"}
+		]
+	}`
 
-func TestWarnings_success(t *testing.T) {
-	want := []Warning{
-		{WarnType: 1, WarnLevel: 3, Headline: "Heavy thunderstorm expected", Regions: []string{"CH01", "CH02"}},
-		{WarnType: 2, WarnLevel: 2, Headline: "Rain warning"},
-	}
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasSuffix(r.URL.Path, "/warnings") {
-			t.Errorf("unexpected path %q", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(want)
-	}))
-	defer srv.Close()
-
-	client := newTestClient(srv.URL)
-	got, err := client.Warnings()
-	if err != nil {
-		t.Fatalf("Warnings() unexpected error: %v", err)
-	}
-	if len(got) != 2 {
-		t.Fatalf("Warnings() len = %d, want 2", len(got))
-	}
-	if got[0].Headline != want[0].Headline {
-		t.Errorf("Headline = %q, want %q", got[0].Headline, want[0].Headline)
-	}
-}
-
-func TestWarnings_emptyList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(body))
 	}))
 	defer srv.Close()
 
 	client := newTestClient(srv.URL)
-	got, err := client.Warnings()
+	got, err := client.PLZDetail(2555)
 	if err != nil {
-		t.Fatalf("Warnings() unexpected error: %v", err)
+		t.Fatalf("PLZDetail() unexpected error: %v", err)
 	}
-	if len(got) != 0 {
-		t.Errorf("expected empty slice, got %d items", len(got))
+	if len(got.Warnings) != 2 {
+		t.Fatalf("Warnings len = %d, want 2", len(got.Warnings))
 	}
-}
-
-func TestWarnings_nonOKStatus(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "server error", http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	client := newTestClient(srv.URL)
-	_, err := client.Warnings()
-	if err == nil {
-		t.Fatal("expected error for 500, got nil")
+	if got.Warnings[0].WarnLevel != 3 {
+		t.Errorf("WarnLevel = %d, want 3", got.Warnings[0].WarnLevel)
+	}
+	if got.Warnings[0].Headline != "Heavy rain expected" {
+		t.Errorf("Headline = %q, want \"Heavy rain expected\"", got.Warnings[0].Headline)
 	}
 }
 
@@ -179,10 +214,10 @@ func TestClient_acceptHeader(t *testing.T) {
 			t.Errorf("Accept = %q, want %q", accept, "application/json")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
 
 	client := newTestClient(srv.URL)
-	_, _ = client.Warnings()
+	_, _ = client.PLZDetail(8000)
 }

@@ -35,7 +35,7 @@ func newForecastCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
-			forecast := detail.TenDaysForecast
+			forecast := detail.Forecast
 			if len(forecast) > days {
 				forecast = forecast[:days]
 			}

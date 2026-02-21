@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/user/meteocli/internal/api"
@@ -55,20 +56,16 @@ func printCurrentWeather(plz int, detail *api.PLZDetail) {
 	out.Sep(44)
 	fmt.Printf("  %s (%s)\n", desc, emoji)
 	fmt.Printf("  Temperature : %.1f °C\n", cw.Temperature)
-	if cw.Time != "" {
-		fmt.Printf("  Observed at : %s\n", cw.Time)
+	if cw.Time != 0 {
+		fmt.Printf("  Observed at : %s\n", time.UnixMilli(cw.Time).Format("2006-01-02 15:04"))
 	}
 	out.Sep(44)
 
 	// Show today's forecast summary if available.
-	if len(detail.TenDaysForecast) > 0 {
-		today := detail.TenDaysForecast[0]
+	if len(detail.Forecast) > 0 {
+		today := detail.Forecast[0]
 		fmt.Printf("  Today       : %.1f / %.1f °C  rain %.1f mm\n",
 			today.TemperatureMin, today.TemperatureMax, today.Precipitation)
-		if today.WindSpeed > 0 {
-			fmt.Printf("  Wind        : %s  %d km/h\n",
-				api.WindDirectionLabel(today.WindDirection), today.WindSpeed)
-		}
 		out.Sep(44)
 	}
 }

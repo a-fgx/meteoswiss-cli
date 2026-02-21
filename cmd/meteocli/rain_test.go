@@ -9,7 +9,7 @@ import (
 
 // anchor is a fixed reference time used across all table-driven tests so
 // results are deterministic regardless of when the tests run.
-var anchor = time.Date(2026, 2, 20, 12, 0, 0, 0, time.UTC)
+var anchor = time.Date(2026, 2, 20, 12, 0, 0, 0, time.Local)
 
 // makeGraph is a helper that builds a GraphData with 10-min high-res slots
 // starting at anchor, optionally followed by hourly low-res slots.
@@ -17,18 +17,16 @@ var anchor = time.Date(2026, 2, 20, 12, 0, 0, 0, time.UTC)
 //   - hiSlots: precipitation values for the 10-min phase
 //   - loSlots: precipitation values for the 60-min phase (empty = no low-res)
 func makeGraph(hiSlots, loSlots []float64) *api.GraphData {
-	hiStart := anchor.Format("2006-01-02T15:04")
-	loStart := ""
-	precipitation := append([]float64{}, hiSlots...)
+	var loStart int64
 	if len(loSlots) > 0 {
 		loTime := anchor.Add(time.Duration(len(hiSlots)) * hiInterval)
-		loStart = loTime.Format("2006-01-02T15:04")
-		precipitation = append(precipitation, loSlots...)
+		loStart = loTime.UnixMilli()
 	}
 	return &api.GraphData{
-		Start:              hiStart,
+		Start:              anchor.UnixMilli(),
 		StartLowResolution: loStart,
-		Precipitation:      precipitation,
+		Precipitation10m:   append([]float64{}, hiSlots...),
+		Precipitation1h:    append([]float64{}, loSlots...),
 	}
 }
 
@@ -128,35 +126,6 @@ func TestGraphRainInWindow_emptyData(t *testing.T) {
 	}
 }
 
-// --- parseGraphTime ---
-
-func TestParseGraphTime_shortFormat(t *testing.T) {
-	got, err := parseGraphTime("2026-02-20T12:00")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Hour() != 12 || got.Minute() != 0 {
-		t.Errorf("parsed time hour=%d min=%d, want 12:00", got.Hour(), got.Minute())
-	}
-}
-
-func TestParseGraphTime_longFormat(t *testing.T) {
-	got, err := parseGraphTime("2026-02-20T12:00:00")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Hour() != 12 {
-		t.Errorf("parsed time hour=%d, want 12", got.Hour())
-	}
-}
-
-func TestParseGraphTime_invalid(t *testing.T) {
-	_, err := parseGraphTime("not-a-time")
-	if err == nil {
-		t.Error("expected error for invalid time string, got nil")
-	}
-}
-
 // --- checkRain ---
 
 func TestCheckRain_graphDataNoRain(t *testing.T) {
@@ -187,9 +156,9 @@ func TestCheckRain_graphDataRainExpected(t *testing.T) {
 }
 
 func TestCheckRain_fallbackToDailyRainy(t *testing.T) {
-	// No graph data — falls back to TenDaysForecast.
+	// No graph data — falls back to Forecast.
 	detail := &api.PLZDetail{
-		TenDaysForecast: []api.DayForecast{
+		Forecast: []api.DayForecast{
 			{DayDate: "2026-02-20", Precipitation: 5.5},
 		},
 	}
@@ -204,7 +173,7 @@ func TestCheckRain_fallbackToDailyRainy(t *testing.T) {
 
 func TestCheckRain_fallbackToDailyDry(t *testing.T) {
 	detail := &api.PLZDetail{
-		TenDaysForecast: []api.DayForecast{
+		Forecast: []api.DayForecast{
 			{DayDate: "2026-02-20", Precipitation: 0},
 		},
 	}

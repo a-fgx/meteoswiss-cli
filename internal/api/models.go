@@ -2,14 +2,15 @@ package api
 
 // PLZDetail is the response from the MeteoSwiss app API for a given Swiss postal code.
 type PLZDetail struct {
-	CurrentWeather  CurrentWeather  `json:"currentWeather"`
-	TenDaysForecast []DayForecast   `json:"tenDaysForecast"`
-	Graph           *GraphData      `json:"graph,omitempty"`
+	CurrentWeather CurrentWeather `json:"currentWeather"`
+	Forecast       []DayForecast  `json:"forecast"`
+	Warnings       []Warning      `json:"warnings"`
+	Graph          *GraphData     `json:"graph,omitempty"`
 }
 
 // CurrentWeather holds the current observed conditions.
 type CurrentWeather struct {
-	Time        string  `json:"time"`
+	Time        int64   `json:"time"`
 	Icon        int     `json:"icon"`
 	Temperature float64 `json:"temperature"`
 }
@@ -18,25 +19,21 @@ type CurrentWeather struct {
 type DayForecast struct {
 	DayDate          string  `json:"dayDate"`
 	IconDay          int     `json:"iconDay"`
-	IconNight        int     `json:"iconNight"`
 	TemperatureMax   float64 `json:"temperatureMax"`
 	TemperatureMin   float64 `json:"temperatureMin"`
 	Precipitation    float64 `json:"precipitation"`
 	PrecipitationMin float64 `json:"precipitationMin"`
 	PrecipitationMax float64 `json:"precipitationMax"`
-	WindDirection    int     `json:"windDirection"`
-	WindSpeed        int     `json:"windSpeed"`
-	Sunshine         float64 `json:"sunshine"`
 }
 
-// GraphData holds hourly data arrays for charting.
+// GraphData holds precipitation data for the rain command.
+// High-resolution (10-min) data starts at Start; low-resolution (1-hour)
+// data starts at StartLowResolution. All timestamps are Unix milliseconds.
 type GraphData struct {
-	Start            string    `json:"start"`
-	StartLowResolution string  `json:"startLowResolution"`
-	Temperature      []float64 `json:"temperature"`
-	Precipitation    []float64 `json:"precipitation"`
-	WindSpeed        []float64 `json:"windSpeed"`
-	WindDirection    []float64 `json:"windDirection"`
+	Start              int64     `json:"start"`
+	StartLowResolution int64     `json:"startLowResolution"`
+	Precipitation10m   []float64 `json:"precipitation10m"`
+	Precipitation1h    []float64 `json:"precipitation1h"`
 }
 
 // Warning represents a MeteoSwiss weather warning.

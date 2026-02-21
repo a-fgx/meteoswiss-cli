@@ -42,17 +42,6 @@ func (c *Client) PLZDetail(plz int) (*PLZDetail, error) {
 	return &result, nil
 }
 
-// Warnings fetches the list of current active weather warnings for
-// Switzerland.
-func (c *Client) Warnings() ([]Warning, error) {
-	url := fmt.Sprintf("%s/warnings", c.baseURL)
-	var result []Warning
-	if err := c.get(url, &result); err != nil {
-		return nil, fmt.Errorf("fetching warnings: %w", err)
-	}
-	return result, nil
-}
-
 // get performs a GET request and JSON-decodes the response body into dst.
 func (c *Client) get(url string, dst any) error {
 	req, err := http.NewRequest(http.MethodGet, url, nil)

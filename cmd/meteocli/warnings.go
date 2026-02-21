@@ -10,33 +10,37 @@ import (
 )
 
 func newWarningsCmd(flags *rootFlags) *cobra.Command {
+	var plz int
 	var warnLevel int
 
 	cmd := &cobra.Command{
 		Use:   "warnings",
-		Short: "Show active MeteoSwiss weather warnings for Switzerland",
-		Example: `  # All active warnings
-  meteocli warnings
+		Short: "Show active weather warnings for a Swiss postal code",
+		Example: `  # All active warnings in Bern
+  meteocli warnings --zip 3000
 
   # Only warnings level 3 and above
-  meteocli warnings --min-level 3
+  meteocli warnings --zip 3000 --min-level 3
 
   # Output as JSON
-  meteocli warnings --json`,
+  meteocli warnings --zip 3000 --json`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if warnLevel < 1 || warnLevel > 5 {
 				return fmt.Errorf("--min-level must be between 1 and 5")
 			}
+			if err := requirePLZ(plz); err != nil {
+				return err
+			}
 
 			client := api.New()
-			warnings, err := client.Warnings()
+			detail, err := client.PLZDetail(plz)
 			if err != nil {
 				return err
 			}
 
 			// Filter by minimum level.
-			filtered := warnings[:0]
-			for _, w := range warnings {
+			var filtered []api.Warning
+			for _, w := range detail.Warnings {
 				if w.WarnLevel >= warnLevel {
 					filtered = append(filtered, w)
 				}
@@ -51,7 +55,9 @@ func newWarningsCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 
+	cmd.Flags().IntVar(&plz, "zip", 0, "Swiss postal code (e.g. 3000 for Bern)")
 	cmd.Flags().IntVar(&warnLevel, "min-level", 1, "minimum warning level to display (1=Minor … 5=Very high)")
+	_ = cmd.MarkFlagRequired("zip")
 	return cmd
 }
 

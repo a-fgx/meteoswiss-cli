@@ -71,7 +71,7 @@ func newRainCmd(flags *rootFlags) *cobra.Command {
 func checkRain(plz, within int, detail *api.PLZDetail, now time.Time) rainResult {
 	result := rainResult{PLZ: plz, WithinMinutes: within}
 
-	if detail.Graph != nil && len(detail.Graph.Precipitation) > 0 {
+	if detail.Graph != nil && len(detail.Graph.Precipitation10m) > 0 {
 		maxMM, ok := graphRainInWindow(detail.Graph, now, time.Duration(within)*time.Minute)
 		if ok {
 			result.MaxRainMM = maxMM
@@ -85,9 +85,9 @@ func checkRain(plz, within int, detail *api.PLZDetail, now time.Time) rainResult
 		}
 	}
 
-	// Fallback: today's daily total from the 10-day forecast.
-	if len(detail.TenDaysForecast) > 0 {
-		today := detail.TenDaysForecast[0]
+	// Fallback: today's daily total from the forecast.
+	if len(detail.Forecast) > 0 {
+		today := detail.Forecast[0]
 		result.MaxRainMM = today.Precipitation
 		result.RainExpected = today.Precipitation > 0
 		if result.RainExpected {
@@ -116,66 +116,50 @@ const (
 //
 // Returns (0, false) when now falls entirely outside the available data.
 func graphRainInWindow(g *api.GraphData, now time.Time, window time.Duration) (maxMM float64, ok bool) {
-	hiStart, err := parseGraphTime(g.Start)
-	if err != nil {
+	if g.Start == 0 {
 		return 0, false
 	}
-
-	var loStart time.Time
-	if g.StartLowResolution != "" {
-		loStart, _ = parseGraphTime(g.StartLowResolution)
-	}
-
-	// Number of high-resolution slots before low-resolution data begins.
-	hiCount := len(g.Precipitation)
-	if !loStart.IsZero() {
-		n := int(loStart.Sub(hiStart) / hiInterval)
-		if n < hiCount {
-			hiCount = n
-		}
-	}
-
 	end := now.Add(window)
-	for t := now; !t.After(end); {
-		var idx int
-		var step time.Duration
 
-		if loStart.IsZero() || t.Before(loStart) {
-			if t.Before(hiStart) {
-				t = t.Add(hiInterval)
-				continue
-			}
-			idx = int(t.Sub(hiStart) / hiInterval)
-			step = hiInterval
-		} else {
-			idx = hiCount + int(t.Sub(loStart)/loInterval)
-			step = loInterval
-		}
-
-		if idx >= len(g.Precipitation) {
+	// High-resolution (10-min) slots.
+	hiStart := time.UnixMilli(g.Start)
+	for i, p := range g.Precipitation10m {
+		slotStart := hiStart.Add(time.Duration(i) * hiInterval)
+		if slotStart.After(end) {
 			break
 		}
-		if idx >= 0 {
+		slotEnd := slotStart.Add(hiInterval)
+		if !slotEnd.After(now) {
+			continue
+		}
+		ok = true
+		if p > maxMM {
+			maxMM = p
+		}
+	}
+
+	// Low-resolution (1-hour) slots.
+	if g.StartLowResolution != 0 {
+		loStart := time.UnixMilli(g.StartLowResolution)
+		for i, p := range g.Precipitation1h {
+			slotStart := loStart.Add(time.Duration(i) * loInterval)
+			if slotStart.After(end) {
+				break
+			}
+			slotEnd := slotStart.Add(loInterval)
+			if !slotEnd.After(now) {
+				continue
+			}
 			ok = true
-			if p := g.Precipitation[idx]; p > maxMM {
+			if p > maxMM {
 				maxMM = p
 			}
 		}
-		t = t.Add(step)
 	}
+
 	return maxMM, ok
 }
 
-// parseGraphTime parses the time strings used in GraphData (Start /
-// StartLowResolution), assuming Swiss local time when no zone is given.
-func parseGraphTime(s string) (time.Time, error) {
-	for _, f := range []string{"2006-01-02T15:04", "2006-01-02T15:04:05", time.RFC3339} {
-		if t, err := time.ParseInLocation(f, s, time.Local); err == nil {
-			return t, nil
-		}
-	}
-	return time.Time{}, fmt.Errorf("cannot parse graph time %q", s)
-}
 
 func printRainCheck(r rainResult) {
 	icon := "☀️"

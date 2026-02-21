@@ -78,7 +78,8 @@ func TestExecute_forecastDaysTooHigh(t *testing.T) {
 
 func TestExecute_warningsInvalidMinLevel(t *testing.T) {
 	for _, level := range []string{"0", "6"} {
-		err := execute([]string{"warnings", "--min-level", level})
+		// --zip is required; --min-level is validated first inside RunE.
+		err := execute([]string{"warnings", "--zip", "1000", "--min-level", level})
 		if err == nil {
 			t.Errorf("expected error for --min-level %s, got nil", level)
 		}
