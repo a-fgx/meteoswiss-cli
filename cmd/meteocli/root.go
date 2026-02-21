@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/user/meteocli/internal/out"
+	"github.com/a-fgx/meteoswiss-cli/internal/out"
 )
 
 var version = "0.1.0"

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/user/meteocli/internal/api"
-	"github.com/user/meteocli/internal/out"
+	"github.com/a-fgx/meteoswiss-cli/internal/api"
+	"github.com/a-fgx/meteoswiss-cli/internal/out"
 )
 
 // rainResult is the structured result for the rain command.

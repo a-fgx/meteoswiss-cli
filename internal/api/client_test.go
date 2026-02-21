@@ -43,8 +43,8 @@ func TestPLZDetail_success(t *testing.T) {
 			t.Errorf("PLZ query param = %q, want %q", got, "800000")
 		}
 		// Verify User-Agent is set.
-		if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "meteocli/") {
-			t.Errorf("User-Agent = %q, expected meteocli/ prefix", ua)
+		if ua := r.Header.Get("User-Agent"); !strings.HasPrefix(ua, "meteoswiss-cli/") {
+			t.Errorf("User-Agent = %q, expected meteoswiss-cli/ prefix", ua)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(want)

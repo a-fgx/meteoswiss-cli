@@ -13,7 +13,7 @@ import (
 
 const (
 	baseURL   = "https://app-prod-ws.meteoswiss-app.ch/v1"
-	userAgent = "meteocli/0.1 (github.com/user/meteocli)"
+	userAgent = "meteoswiss-cli/0.1 (github.com/a-fgx/meteoswiss-cli)"
 )
 
 // Client is an HTTP client for the MeteoSwiss app API.

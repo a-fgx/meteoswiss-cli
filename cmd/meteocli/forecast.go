@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/user/meteocli/internal/api"
-	"github.com/user/meteocli/internal/out"
+	"github.com/a-fgx/meteoswiss-cli/internal/api"
+	"github.com/a-fgx/meteoswiss-cli/internal/out"
 )
 
 func newForecastCmd(flags *rootFlags) *cobra.Command {

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/meteocli/internal/api"
+	"github.com/a-fgx/meteoswiss-cli/internal/api"
 )
 
 // anchor is a fixed reference time used across all table-driven tests so

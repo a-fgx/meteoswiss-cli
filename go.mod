@@ -1,4 +1,4 @@
-module github.com/user/meteocli
+module github.com/a-fgx/meteoswiss-cli
 
 go 1.21
 
