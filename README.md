@@ -21,11 +21,11 @@ go install github.com/user/meteocli/cmd/meteocli@latest
 ## Quick Start
 
 ```bash
-# Current weather in Zurich (PLZ 8000)
-meteocli weather --zip 8000
+# Current weather in Zurich (PLZ 8001)
+meteocli weather --zip 8001
 
 # 7-day forecast for Bern
-meteocli forecast --zip 3000
+meteocli forecast --zip 3001
 
 # 3-day forecast for Geneva, JSON output
 meteocli forecast --zip 1200 --days 3 --json
